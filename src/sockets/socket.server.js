@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
 const aiServices = require('../services/ai.service');
 const massageModel = require('../models/massage.model');
+const {createMomory,queryMemory} = require('../services/vector.service')
 
  function socketServer (httpServer){
     const io = new Server(httpServer,{
@@ -48,13 +49,13 @@ const massageModel = require('../models/massage.model');
         socket.on ("ai-massage",async(payload)=>{
 
             
-                        console.log(typeof (payload))
+            //             console.log(typeof (payload))
 
-            console.log(socket.user._id)
+            // console.log(socket.user._id)
             const massagePayload = JSON.parse(payload);
             
 
-            await massageModel.create({ 
+            const userMassage = await massageModel.create({ 
                 chat :massagePayload.chatId,
                 user: socket.user._id,
                 content: massagePayload.content,
@@ -62,7 +63,31 @@ const massageModel = require('../models/massage.model');
             })
             console.log( "msaagae load", massagePayload.content)
 
-            const chatHistory = await massageModel.find({chat: massagePayload.chatId})
+
+
+            const vectors = await aiServices.generateEmbedings(massagePayload.content);
+
+            const memory = await queryMemory({
+                queryVector: vectors[0].values,
+                limit:3,
+                metadata:{}})
+
+            // console.log("vector", typeof vectors[0])
+            // console.log("vector", typeof vectors[0].values)
+            await createMomory({
+                vectors : vectors[0].values,
+                massageId: userMassage._id,
+                metadata:{
+                    chatId: massagePayload.chatId,
+                    user: socket.user._id,
+                    text: massagePayload.content,
+                }
+                })
+            console.log("vector", vectors);
+            console.log("memory", memory);
+
+            const chatHistory = await massageModel.find({chat: massagePayload.chatId}).sort({createdAt:-1}).limit(20);
+            chatHistory.reverse();
             
             console.log("chat history", );
             
@@ -76,13 +101,23 @@ const massageModel = require('../models/massage.model');
 
 
 
-            await massageModel.create({
+            const responseMassage = await massageModel.create({
                 chat :massagePayload.chatId,
                 user: socket.user._id,
                 content: aiResponse,
                 role: "model"
             })
             console.log(aiResponse)
+                const responseVectors = await aiServices.generateEmbedings(aiResponse);
+                await createMomory({
+                    vectors : responseVectors[0].values,
+                    massageId: responseMassage._id,
+                    metadata:{
+                        chatId: massagePayload.chatId,
+                        user: socket.user._id,
+                        text: massagePayload.content,
+                    }
+                    })
             socket.emit("ai-massage-response",{
 
                 content: aiResponse,
