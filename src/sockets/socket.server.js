@@ -88,18 +88,33 @@ const {createMomory,queryMemory} = require('../services/vector.service')
 
             const chatHistory = await massageModel.find({chat: massagePayload.chatId}).sort({createdAt:-1}).limit(20);
             chatHistory.reverse();
-            
-            console.log("chat history", );
-            
-            const aiResponse = await aiServices.generateContent(chatHistory.map((item)=>{
+
+
+            const stm = chatHistory.map((item)=>{
                 return{
                     role:item.role,
-                    parts:[{text:item.content}]
+                   parts:[{text:item.content}  ]     
                 }
-            }));
+            })
 
 
+            const ltm = [{
+                role:"user",
+                parts:[{text:`
+                    these are previous messages from the chat, use them to generate better response if relevant:
+                    ${memory.map((item)=> item.metadata.text).join("\n")}
+                `}]
+            }]
+            
+            console.log("chat history", );
+            console.log("ltm" ,ltm[0])
+            console.log("stm" ,stm)
+            
+            
+            const aiResponse = await aiServices.generateContent([...ltm, ...stm]);
 
+
+ 
 
             const responseMassage = await massageModel.create({
                 chat :massagePayload.chatId,
@@ -115,9 +130,11 @@ const {createMomory,queryMemory} = require('../services/vector.service')
                     metadata:{
                         chatId: massagePayload.chatId,
                         user: socket.user._id,
-                        text: massagePayload.content,
-                    }
+                        text: responseMassage.content,
+                    } 
                     })
+                    console.log(responseMassage)
+
             socket.emit("ai-massage-response",{
 
                 content: aiResponse,
