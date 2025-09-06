@@ -4,13 +4,15 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
 const aiServices = require('../services/ai.service');
 const massageModel = require('../models/massage.model');
-const {createMomory,queryMemory} = require('../services/vector.service')
+const { createMemory, queryMemory } = require('../services/vector.service');
+const { trusted } = require('mongoose');
 
  function socketServer (httpServer){
     const io = new Server(httpServer,{
         cors:{
             origin:"http://localhost:3000",
-            methods:["GET","POST"]
+            methods:["GET","POST"],
+            credentials: true,
         }
     });
 
@@ -74,9 +76,9 @@ const {createMomory,queryMemory} = require('../services/vector.service')
 
             // console.log("vector", typeof vectors[0])
             // console.log("vector", typeof vectors[0].values)
-            await createMomory({
+             createMemory({
                 vectors : vectors[0].values,
-                massageId: userMassage._id,
+                messageId: userMassage._id,
                 metadata:{
                     chatId: massagePayload.chatId,
                     user: socket.user._id,
@@ -124,9 +126,9 @@ const {createMomory,queryMemory} = require('../services/vector.service')
             })
             console.log(aiResponse)
                 const responseVectors = await aiServices.generateEmbedings(aiResponse);
-                await createMomory({
+                await createMemory({
                     vectors : responseVectors[0].values,
-                    massageId: responseMassage._id,
+                    messageId: responseMassage._id,
                     metadata:{
                         chatId: massagePayload.chatId,
                         user: socket.user._id,
